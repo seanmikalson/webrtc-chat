@@ -14,7 +14,7 @@ var WebRtc = {
       sessionDescription: peerConnection.localDescription
     });
   },
-  initializeWebRtc: function(socket, userId) {
+  initializeWebRtc: function(socket, userId, callback) {
     var config = {
       iceServers: [
         {
@@ -23,6 +23,14 @@ var WebRtc = {
       ]
     };
     var peerConnection = new webkitRTCPeerConnection(config);
+
+    var dataChannelOptions = {
+      ordered: false, //no guaranteed delivery, unreliable but faster
+      maxRetransmitTime: 1000, //milliseconds
+    };
+
+    var dataChannel = peerConnection.createDataChannel(dataChannelOptions);
+    peerConnection.ondatachannel = callback;
 
     peerConnection.onicecandidate = function(event) {
       if(event.candidate) {
@@ -43,13 +51,13 @@ var WebRtc = {
           if(peerConnection.remoteDescription.type === 'offer') {
             peerConnection.createAnswer().then(function(sdp) {
               return peerConnection.setLocalDescription(sdp);
-            }).then(WebRtc.sendSessionDescription.bind(this, peerConnection, socket, userId));
+            }).then(WebRtc.sendSessionDescription.bind(this, peerConnection, socket, userId, callback));
           }
         });
       }
     });
 
-    return peerConnection;
+    return {peerConnection: peerConnection, dataChannel: dataChannel};
   },
   requestPeerConnection: function(peerConnection, socket, userid) {
     peerConnection.createOffer().then(function(sdp) {
